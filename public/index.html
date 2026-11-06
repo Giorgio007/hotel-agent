@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotel Estrella</title>
+  <style>
+    :root { --navy: #1B2A41; --accent: #C8553D; --line: #e4e6ea; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fff; color: var(--navy);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; }
+    main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 28px; margin: 32px 0 4px; font-weight: 600; }
+    .lead { margin: 0 0 32px; opacity: .8; }
+    .weather { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; font-size: 13px; }
+    .day { border: 1px solid var(--line); border-radius: 8px; padding: 8px 2px; }
+    .day b { display: block; font-size: 15px; }
+    label { display: block; font-weight: 600; margin: 20px 0 6px; }
+    input, textarea { width: 100%; padding: 12px; font: inherit; color: inherit;
+      border: 1px solid #c9cdd4; border-radius: 8px; }
+    textarea { min-height: 140px; resize: vertical; }
+    button { margin-top: 24px; background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+      padding: 12px 28px; font: inherit; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #reply { margin-top: 32px; white-space: pre-wrap; }
+    #reply.box { border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="weather" id="weather" aria-label="Seven-day forecast for Barcelona"></div>
+
+  <h1>Hotel Estrella</h1>
+  <p class="lead">Write to us and our assistant will reply right away.</p>
+
+  <form id="form">
+    <label for="name">Name</label>
+    <input id="name" name="name" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+    <label for="message">Please leave your message</label>
+    <textarea id="message" name="message" required></textarea>
+    <button type="submit" id="send">Send</button>
+  </form>
+
+  <div id="reply" aria-live="polite"></div>
+</main>
+
+<script>
+  // 7-day Barcelona forecast from Open-Meteo, fetched by the page itself.
+  const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=41.3874&longitude=2.1686"
+    + "&daily=temperature_2m_max,precipitation_probability_max&timezone=Europe%2FMadrid&forecast_days=7";
+
+  fetch(WEATHER_URL)
+    .then((r) => r.json())
+    .then((data) => {
+      const d = data.daily;
+      document.getElementById("weather").innerHTML = d.time.map((date, i) => {
+        const label = new Date(date + "T12:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric" });
+        return `<div class="day">${label}<b>${Math.round(d.temperature_2m_max[i])}°</b>${d.precipitation_probability_max[i]}% rain</div>`;
+      }).join("");
+    })
+    .catch(() => { document.getElementById("weather").textContent = "Forecast not available."; });
+
+  // Send the form to the backend and show the reply under it.
+  const form = document.getElementById("form");
+  const replyBox = document.getElementById("reply");
+  const sendButton = document.getElementById("send");
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    sendButton.disabled = true;
+    replyBox.className = "";
+    replyBox.textContent = "Sending...";
+    try {
+      const res = await fetch("/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.value,
+          email: form.email.value,
+          message: form.message.value,
+        }),
+      });
+      const data = await res.json();
+      replyBox.textContent = data.reply || data.error;
+      replyBox.className = "box";
+    } catch {
+      replyBox.textContent = "Sorry, the message could not be sent. Please try again.";
+    }
+    sendButton.disabled = false;
+  });
+</script>
+</body>
+</html>

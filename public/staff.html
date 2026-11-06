@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- NOTE: this page has no login yet. Anyone who can open /staff can read every guest request. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotel Estrella staff</title>
+  <style>
+    body { margin: 0; padding: 16px; color: #1B2A41; background: #fff;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .filters button { font: inherit; padding: 4px 10px; margin-right: 4px; border: 1px solid #c9cdd4;
+      background: #fff; border-radius: 4px; cursor: pointer; }
+    .filters button.on { background: #1B2A41; color: #fff; border-color: #1B2A41; }
+    .wrap { overflow-x: auto; margin-top: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #e4e6ea; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f4f5f7; position: sticky; top: 0; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #fafafa; }
+    tr.trace td { background: #f7f8fa; font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
+    .ESCALATED { color: #C8553D; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Guest requests</h1>
+  <div class="filters">
+    <button data-f="All" class="on">All</button>
+    <button data-f="ESCALATED">Escalated</button>
+    <button data-f="ANSWERED">Answered</button>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Name</th><th>Email</th><th>Message</th><th>Department</th>
+          <th>Urgency</th><th>Status</th><th>Reply</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+<script>
+  let all = [];
+  let filter = "All";
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function traceLines(trace) {
+    return (trace || []).map((t) => {
+      if (t.type === "model") return `step ${t.step}: model stop_reason=${t.stop_reason}${t.asked_tool ? ", asked for a tool" : ""}`;
+      if (t.type === "tool") return `  tool ${t.name}(${JSON.stringify(t.arguments)}) -> ${t.result}`;
+      return `final: ${t.text}`;
+    }).join("\n");
+  }
+
+  function render() {
+    const rows = all.filter((r) => filter === "All" || r.status === filter);
+    document.getElementById("rows").innerHTML = rows.map((r, i) => `
+      <tr data-i="${i}">
+        <td>${esc(new Date(r.time).toLocaleString("en-GB"))}</td><td>${esc(r.name)}</td><td>${esc(r.email)}</td>
+        <td>${esc(r.message)}</td><td>${esc(r.department)}</td><td>${esc(r.urgency)}</td>
+        <td class="${esc(r.status)}">${esc(r.status)}${r.note ? "<br>(" + esc(r.note) + ")" : ""}</td><td>${esc(r.reply)}</td>
+      </tr>`).join("") || `<tr><td colspan="8">No requests.</td></tr>`;
+
+    document.querySelectorAll("#rows tr[data-i]").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        const next = tr.nextElementSibling;
+        if (next && next.classList.contains("trace")) return next.remove();
+        const row = rows[tr.dataset.i];
+        tr.insertAdjacentHTML("afterend", `<tr class="trace"><td colspan="8">${esc(traceLines(row.trace))}</td></tr>`);
+      });
+    });
+  }
+
+  document.querySelectorAll(".filters button").forEach((b) => {
+    b.addEventListener("click", () => {
+      filter = b.dataset.f;
+      document.querySelectorAll(".filters button").forEach((x) => x.classList.toggle("on", x === b));
+      render();
+    });
+  });
+
+  fetch("/api/requests").then((r) => r.json()).then((data) => { all = data; render(); });
+</script>
+</body>
+</html>
