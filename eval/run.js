@@ -22,7 +22,7 @@ const gradeSchema = {
 };
 
 async function grade(c, out) {
-  const toolResults = out.trace.filter((t) => t.type === "tool");
+  const toolResults = out.toolResults; // full results, not the 200-character trace
   const prompt = [
     rubric,
     "# Hotel policies\n\n" + POLICIES,

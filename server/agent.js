@@ -61,6 +61,7 @@ function lookupBooking(email) {
 // options.stubLog = true (used by the eval): nothing is saved, the trace says "stubbed".
 export async function runAgent({ name, email, message }, options = {}) {
   const trace = [];
+  const toolResults = []; // full, uncut results (the eval's judge needs them)
   let logged = null; // the four fields from log_request
   let reply = "";
 
@@ -119,6 +120,7 @@ export async function runAgent({ name, email, message }, options = {}) {
         arguments: call.input,
         result: text.slice(0, 200) + (options.stubLog && call.name === "log_request" ? " (stubbed)" : ""),
       });
+      toolResults.push({ name: call.name, arguments: call.input, result: text });
       results.push({ type: "tool_result", tool_use_id: call.id, content: text });
     }
     messages.push({ role: "user", content: results });
@@ -133,7 +135,7 @@ export async function runAgent({ name, email, message }, options = {}) {
   const fields = logged || { department: "", urgency: "normal", summary: "", status: "ESCALATED" };
   const note = logged ? undefined : "no log_request call";
 
-  return { ...fields, reply, note, trace };
+  return { ...fields, reply, note, trace, toolResults };
 }
 
 // Append one finished request to data/requests.json.
